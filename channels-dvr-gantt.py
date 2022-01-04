@@ -9,11 +9,12 @@ import socketserver
 
 # CHANGE THESE FOR YOUR CONFIGURATION
 #--------------------------------------------
-channels_dvr="http://<<your channels-dvr ip>>:8089/"
-PORT = 8889
+channels_dvr="http://localhost:8089/"
+PORT = 8889 # port this will respond on
 #--------------------------------------------
 
 jobs=[]
+providers=[]
 
 class MyHttpRequestHandler(http.server.SimpleHTTPRequestHandler):
     def do_GET(self):
@@ -36,6 +37,20 @@ class job:
                 self.channel = channel
                 self.start = start
                 self.duration = duration
+                self.provider = getProvider(channel)
+
+class provider:
+    def __init__(self,deviceID,FriendlyName,channels):
+        self.id = deviceID
+        self.name = FriendlyName
+        self.channels = channels
+
+class channel:
+    def __init__(self,id,guideNumber,guideName,station):
+        self.id = id
+        self.number = guideNumber
+        self.name = guideName
+        self.station = station
 
 def getJobs():
         result = requests.get(channels_dvr + "dvr/jobs")
@@ -43,8 +58,28 @@ def getJobs():
         for row in data:
                 jobs.append((row['Time'],job(row['ID'],row['Name'],row['Airing']['Channel'],row['Time'],row['Duration'])))
 
+def getProviders():
+    result = requests.get(channels_dvr + "devices")
+    data = result.json()
+    for row in data:
+        chans = []
+        for chan in row['Channels']:
+            try:
+                if not 'Hidden' in chan:
+                    chans.append(channel(chan['ID'],chan['GuideNumber'],chan['GuideName'],chan['Station']))
+            except:
+                pass
+        providers.append((row['FriendlyName'],provider(row['DeviceID'],row['FriendlyName'],chans)))
+
+def getProvider(channel):
+	for x,pro in providers:
+		for chan in pro.channels:
+			if str(chan.number) == str(channel):
+				return(pro.name)
+
 def getHTML():
         getJobs()
+        getProviders()
         jobs.sort(key=lambda x: x[0]) # sort list by start time
         firststart = jobs[0][0]
         firststart_adj = firststart//(60 * 15) * (60 * 15) # round down to nearest 15 minute increment for the actual start time for the graph
@@ -91,6 +126,7 @@ table td.bar {
                 id=job.id
                 name=job.name
                 channel=job.channel
+                provider=job.provider
                 start=job.start//60
                 duration=job.duration//60
                 delay = start-(firststart_adj//60)
@@ -101,8 +137,7 @@ table td.bar {
 <td width=\""""+str(delay)+"""px"></td>
 <td style="background-color: red;" width=\""""+str(duration)+"""px" title=\""""+str(time.strftime('%m-%d-%Y %H:%M', time.localtime(start*60)))+""" - """+str(time.strftime('%H:%M', time.localtime(start*60+duration*60)))+"""\">
 </td>
-<td>&nbsp;<b>"""+str(name)+"""</b>&nbsp;(ch:"""+str(channel)+""") ("""+str(duration)+""" mins)<!-- 
-"""+str(time.strftime('%Y-%m-%d %H:%M', time.localtime(start*60)))+"""&nbsp;-&nbsp;"""+str(time.strftime('%Y-%m-%d %H:%M', time.localtime(start*60+duration*60)))+""" -->
+<td>&nbsp;<b>"""+str(name)+"""</b>&nbsp;(ch:"""+str(channel)+","+str(provider)+""") ("""+str(duration)+""" mins)
 
 </td>
 </tr>
