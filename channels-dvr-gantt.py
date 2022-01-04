@@ -51,7 +51,6 @@ def getHTML():
         firststart_text = str(time.strftime('%Y-%m-%d %H:%M', time.localtime(firststart_adj)))
         lastend = jobs[-1][0] + jobs[-1][1].duration
         lastend_marker = lastend//(60 * 15) * (60 * 15) + (60 * 15)
-        lastend_marker_text = str(time.strftime('%Y-%m-%d %H:%M', time.localtime(lastend_marker)))
         tot_time = math.ceil((lastend_marker-firststart_adj)/3600) #this is in hours!
         minutes_per_pixel = 60 # one minute per pixel graphing in seconds -- can be shortened here
         tot_width = tot_time * minutes_per_pixel
