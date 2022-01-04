@@ -9,7 +9,7 @@ import socketserver
 
 # CHANGE THESE FOR YOUR CONFIGURATION
 #--------------------------------------------
-channels_dvr="http://192.168.1.104:8089/"
+channels_dvr="http://<<your channels-dvr ip>>:8089/"
 PORT = 8889
 #--------------------------------------------
 
