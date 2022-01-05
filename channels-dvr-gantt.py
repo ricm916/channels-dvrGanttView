@@ -23,7 +23,7 @@ from urllib.parse import parse_qs
 
 # CHANGE THESE FOR YOUR CONFIGURATION
 #--------------------------------------------
-channels_dvr="http://192.168.1.104:8089/"
+channels_dvr="http://localhost:8089/"
 PORT = 8889 # port this will respond on
 #--------------------------------------------
 
