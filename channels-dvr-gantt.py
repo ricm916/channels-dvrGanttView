@@ -58,13 +58,10 @@ class MyHttpRequestHandler(http.server.SimpleHTTPRequestHandler):
         if 'source' in query_components:
             source = query_components["source"][0]
 
-        #print(parse_qs(urlparse(self.path).query)) #log the query string to console
         html = getHTML(source)
 
         # Writing the HTML contents with UTF-8
         self.wfile.write(bytes(html, "utf8"))
-        jobs.clear()
-        providers.clear()
         return
 
 class job:
