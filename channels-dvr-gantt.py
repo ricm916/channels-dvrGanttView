@@ -8,6 +8,7 @@ import http.server
 import socketserver
 from urllib.parse import urlparse
 from urllib.parse import parse_qs
+import cgi
 
 
 #--------------------------------------------------------------
@@ -30,7 +31,7 @@ PORT = 8889 # port this will respond on
 jobs=[]
 providers=[]
 
-# re-order these however you want -- be sure to add more IF you have more than 13 sources... 
+# re-order these however you want -- be sure to add more IF you have more than 13 sources...
 colors = [
     "#FF0000", #Red
     "#808080", #Gray
@@ -54,71 +55,96 @@ class MyHttpRequestHandler(http.server.SimpleHTTPRequestHandler):
         self.end_headers()
 
         source = 'all'
-        query_components = parse_qs(urlparse(self.path).query)
-        if 'source' in query_components:
-            source = query_components["source"][0]
-
         html = getHTML(source)
 
         # Writing the HTML contents with UTF-8
         self.wfile.write(bytes(html, "utf8"))
         return
 
+    def do_POST(self):
+
+        # Parse the form data posted
+        form = cgi.FieldStorage(
+            fp=self.rfile,
+            headers=self.headers,
+            environ={
+                'REQUEST_METHOD': 'POST',
+                'CONTENT_TYPE': self.headers['Content-Type'],
+            }
+        )
+
+        self.send_response(200) # Sending an '200 OK' response
+        self.send_header("Content-type", "text/html")
+        self.end_headers()
+
+        source=form['source'].value
+
+        html = getHTML(source)
+
+        # Writing the HTML contents with UTF-8
+        self.wfile.write(bytes(html, "utf8"))
+        jobs.clear()
+        providers.clear()
+        return
+
 class job:
-        def __init__(self,id,name,channel,start,duration):
-                self.id = id
-                self.name = name
-                self.channel = channel
-                self.start = start
-                self.duration = duration
-                self.provider = getProvider(channel)
+    def __init__(self,name,channel,start,duration):
+        self.name = name
+        self.channel = channel
+        self.start = start
+        self.duration = duration
+        self.provider = getProvider(channel)
 
 class provider:
     def __init__(self,deviceID,FriendlyName,channels,color_num):
-        self.id = deviceID
         self.name = FriendlyName
         self.channels = channels
         self.color = colors[color_num]
-    def getColor(self,key):
-        return [color for color in self if getattr(name == key)]
 
 class channel:
-    def __init__(self,id,guideNumber,guideName,station):
-        self.id = id
+    def __init__(self,guideNumber,guideName):
         self.number = guideNumber
         self.name = guideName
-        self.station = station
+
+def getJson(url):
+    return requests.get(url).json()
 
 def getJobs(source="all"):
     jobs.clear()
-    result = requests.get(channels_dvr + "dvr/jobs")
-    data = result.json()
-    for row in data:
+    for row in getJson(channels_dvr + "dvr/jobs"):
         if (getProvider(row['Airing']['Channel']) == source) or (source == 'all'):
-            jobs.append((row['Time'],job(row['ID'],row['Name'],row['Airing']['Channel'],row['Time'],row['Duration'])))
+            jobs.append((row['Time'],job(row['Name'],row['Airing']['Channel'],row['Time'],row['Duration'])))
 
 def getProviders():
     providers.clear()
-    result = requests.get(channels_dvr + "devices")
-    data = result.json()
     x = 0
-    for row in data:
+    for row in getJson(channels_dvr + "devices"):
         chans = []
         for chan in row['Channels']:
+            #print(chan)
             try:
                 if not 'Hidden' in chan: # filter out hidden channels - there won't be anything scheduled to these
-                    chans.append(channel(chan['ID'],chan['GuideNumber'],chan['GuideName'],chan['Station']))
+                    chans.append(channel(chan['GuideNumber'],chan['GuideName']))
             except:
                 pass
         providers.append((row['FriendlyName'],provider(row['DeviceID'],row['FriendlyName'],chans, x)))
         x+=1
+    providers.sort()
 
 def getProvider(channel):
-	for x,pro in providers:
-		for chan in pro.channels:
-			if str(chan.number) == str(channel):
-				return(pro.name)
-	 
+        for x,pro in providers:
+                for chan in pro.channels:
+                        if str(chan.number) == str(channel):
+                                return(pro.name)
+
+def formatTime(tm, fmt="%m-%d-%Y %H:%M"):
+    return str(time.strftime(fmt, time.localtime(tm)))
+
+def getColor(prv):
+    try:
+        return [p[1].color for p in providers if p[0] == prv][0]
+    except:
+        return "red"
 
 def getHEAD(tot_width,selectors):
     HEAD="""
@@ -148,12 +174,11 @@ table td.bar {
 </style>
 </head>
 <body>
-<br />Updated: <b>"""+str(time.strftime('%Y-%m-%d %H:%M', time.localtime(time.time())))+"""</b><br /><br />
-<form method="get" action="/"><select name="source" onchange="this.form.submit()">"""+selectors+"""</select>
+<br />Updated: <b>"""+formatTime(time.time())+"""</b><br /><br />
+<form method="post" action="/"><select name="source" onchange="this.form.submit()">"""+selectors+"""</select>
 </form>
 """
     return HEAD
-
 
 def getHTML(source):
         getProviders()
@@ -163,20 +188,17 @@ def getHTML(source):
             jobs.sort(key=lambda x: x[0]) # sort list by start time
             firststart = jobs[0][0]
             firststart_adj = firststart//(60 * 15) * (60 * 15) # round down to nearest 15 minute increment for the actual start time for the graph
-            firststart_text = str(time.strftime('%Y-%m-%d %H:%M', time.localtime(firststart_adj)))
             lastend = jobs[-1][0] + jobs[-1][1].duration
             lastend_marker = lastend//(60 * 15) * (60 * 15) + (60 * 15)
-            tot_time = math.ceil((lastend_marker-firststart_adj)/3600) #this is in hours!
-            minutes_per_pixel = 60 # one minute per pixel graphing in seconds -- can be shortened here
-            tot_width = tot_time * minutes_per_pixel
+            tot_width = math.ceil((lastend_marker-firststart_adj)/60)
 
         selectors = ""
         if source == "all":
             selectors = "<option value=\"all\" SELECTED>All sources</option>"
         else:
             selectors = "<option value=\"all\">All sources</option>"
-        
-        for name in [name for name, ob in providers]:
+
+        for name in [p[0] for p in providers]:
             selectors += "<option value=\""+name+"\" "
             if name == source:
                 selectors += " SELECTED"
@@ -189,28 +211,27 @@ def getHTML(source):
             x=0
             for start, job in jobs:
                 x+=1
-                id=job.id
                 name=job.name
                 channel=job.channel
                 provider=job.provider
-                start=job.start//60
+                start=job.start
                 duration=job.duration//60
-                delay = start-(firststart_adj//60)
+                delay = start//60-(firststart_adj//60)
                 HTML_BODY += """
 <tr>
 <td class="bar">
 <table cellspacing="0" cellpadding="0" style="border: 0px;" width=\""""+str(tot_width)+"""px"><tr>
 <td width=\""""+str(delay)+"""px\""""
                 if x > len(jobs)/2:
-                    HTML_BODY+=""" align="right"><b>"""+str(name)+"</b>&nbsp;(ch:"+str(channel)+","+str(provider)+") ("+str(duration)+" mins)&nbsp;</td>"
+                    HTML_BODY+=""" align="right"><b>"""+name+"</b>&nbsp;(ch:"+str(channel)+","+provider+") ("+str(duration)+" mins)&nbsp;</td>"
                 else:
                     HTML_BODY+=">"
-                
+
                 HTML_BODY+="""
-</td><td style="background-color: """+[p[1].color for p in providers if p[0] == provider][0]+""";" width=\""""+str(duration)+"""px" title=\""""+str(time.strftime('%m-%d-%Y %H:%M', time.localtime(start*60)))+""" - """+str(time.strftime('%H:%M', time.localtime(start*60+duration*60)))+"""\">
+</td><td style="background-color: """+getColor(provider)+""";" width=\""""+str(duration)+"""px" title=\""""+formatTime(start)+""" - """+formatTime(start+duration*60,'%H:%M')+"""\">
 </td><td>"""
                 if x <= len(jobs)/2:
-                    HTML_BODY+="&nbsp;<b>"+str(name)+"</b>&nbsp;(ch:"+str(channel)+","+str(provider)+") ("+str(duration)+" mins)"
+                    HTML_BODY+="&nbsp;<b>"+name+"</b>&nbsp;(ch:"+str(channel)+","+provider+") ("+str(duration)+" mins)"
                 HTML_BODY+="""
 </td>
 </tr>
