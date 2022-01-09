@@ -14,14 +14,10 @@ import cgi
 
 #------------------------------------------------------------------
 try:
-    channels_dvr = os.environ('channels', 'http://localhost:8089/') # where to find channels-dvr server
-    if channels_dvr[-1] != "/": channels_dvr += "/"
-    PORT = 80 # port this will respond on
-    auto_refresh = str(os.environ('refresh', '30')) # number of seconds for html refresh meta tag
-except:
-    channels_dvr = 'http://192.168.1.104:8089/'#) # where to find channels-dvr server
-    PORT = 80 # port this will respond on
-    auto_refresh = '30'#)) # number of seconds for html refresh meta tag
+channels_dvr = os.environ('channels', 'http://localhost:8089/') # where to find channels-dvr server
+if channels_dvr[-1] != "/": channels_dvr += "/"
+PORT = 80 # port this will respond on
+auto_refresh = str(os.environ('refresh', '60')) # number of seconds for html refresh meta tag
 #------------------------------------------------------------------
 
 jobs=[]
