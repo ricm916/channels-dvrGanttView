@@ -13,10 +13,15 @@ from urllib.parse import parse_qs
 import cgi
 
 #------------------------------------------------------------------
-channels_dvr = os.environ.get('channels', 'http://localhost:8089') # where to find channels-dvr server
-if channels_dvr[-1] != "/": channels_dvr += "/"
-PORT = 80 # port this will respond on
-auto_refresh = str(os.environ.get('refresh', '60')) # number of seconds for html refresh meta tag
+try:
+    channels_dvr = os.environ('channels', 'http://localhost:8089/') # where to find channels-dvr server
+    if channels_dvr[-1] != "/": channels_dvr += "/"
+    PORT = 80 # port this will respond on
+    auto_refresh = str(os.environ('refresh', '30')) # number of seconds for html refresh meta tag
+except:
+    channels_dvr = 'http://192.168.1.104:8089/'#) # where to find channels-dvr server
+    PORT = 80 # port this will respond on
+    auto_refresh = '30'#)) # number of seconds for html refresh meta tag
 #------------------------------------------------------------------
 
 jobs=[]
@@ -88,11 +93,13 @@ class job:
         self.start = start
         self.duration = duration
         self.provider = getProvider(channel)
+        self.deviceid = getDeviceId(channel)
         self.endtime = start + duration
 
 class provider:
     def __init__(self,deviceID,FriendlyName,channels,color_num):
         self.name = FriendlyName
+        self.deviceid = deviceID
         self.channels = channels
         self.color = colors[color_num]
 
@@ -130,6 +137,12 @@ def getProvider(channel):
 		for chan in pro.channels:
 			if str(chan.number) == str(channel):
 				return(pro.name)
+
+def getDeviceId(channel):
+	for x,pro in providers:
+		for chan in pro.channels:
+			if str(chan.number) == str(channel):
+				return(pro.deviceid)
 
 def formatTime(tm, fmt="%m-%d-%Y %H:%M"):
     return str(time.strftime(fmt, time.localtime(tm)))
@@ -200,11 +213,11 @@ def getHTML(source):
         else:
             selectors = "<option value=\"all\">All sources</option>"
 
-        for name in [p[0] for p in providers]:
-            selectors += "<option value=\""+name+"\" "
-            if name == source:
+        for p in [p[1] for p in providers]:
+            selectors += "<option value=\""+p.name+"\" "
+            if p.name == source:
                 selectors += " SELECTED"
-            selectors+= ">"+name+"</option>"
+            selectors+= ">"+p.name+"["+p.deviceid+"]"+"</option>"
 
         HTML_HEAD = getHEAD(tot_width,selectors)
 
@@ -222,6 +235,7 @@ def getHTML(source):
                 name=job.name
                 channel=job.channel
                 provider=job.provider
+                deviceid=job.deviceid
                 start=job.start
                 duration=job.duration//60
                 delay = start//60-(firststart_adj//60)
@@ -249,10 +263,10 @@ def getHTML(source):
                     else:
                         HTML_BODY+=">"
 
-                HTML_BODY+="""</td><td style="background-color: """ + getColor(provider) + """;" width=\"""" + str(duration) + """px" title=\"""" + formatTime(start) + \
+                HTML_BODY+="""</td><td style="background-color: """ + getColor(provider) + """;" width=\"""" + str(duration) + """px" title=\"""" + formatTime(start, '%a %B %-d, %Y %H:%M') + \
                 """ - """ + formatTime(start+duration*60,'%H:%M') + """\"></td><td>"""
                 if x <= len(jobs)/2:
-                    HTML_BODY+="&nbsp;<b>" + name + "</b>&nbsp;(ch:" + str(channel) + "," + provider + ") (" + str(duration) + " mins)"
+                    HTML_BODY+="&nbsp;<b>" + name + "</b>&nbsp;(ch:" + str(channel) + "," + provider + " ["+deviceid+"]) (" + str(duration) + " mins)"
 
                 HTML_BODY+="</td></tr><tr>"
 
@@ -284,4 +298,3 @@ def run():
 
 if __name__ == '__main__':
 	run()
-
