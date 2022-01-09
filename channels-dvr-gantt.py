@@ -13,7 +13,6 @@ from urllib.parse import parse_qs
 import cgi
 
 #------------------------------------------------------------------
-try:
 channels_dvr = os.environ('channels', 'http://localhost:8089/') # where to find channels-dvr server
 if channels_dvr[-1] != "/": channels_dvr += "/"
 PORT = 80 # port this will respond on
