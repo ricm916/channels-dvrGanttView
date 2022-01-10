@@ -28,4 +28,4 @@ You can see the recording schedule in your browser:
 http://<<ip address of host>>:8889
 ```
 ## License
-GNU General Public License v3.0
+MIT
