@@ -13,10 +13,10 @@ from urllib.parse import parse_qs
 import cgi
 
 #------------------------------------------------------------------
-channels_dvr = os.environ('channels', 'http://localhost:8089/') # where to find channels-dvr server
+channels_dvr = os.environ.get('channels', 'http://localhost:8089/') # where to find channels-dvr server
 if channels_dvr[-1] != "/": channels_dvr += "/"
 PORT = 80 # port this will respond on
-auto_refresh = str(os.environ('refresh', '60')) # number of seconds for html refresh meta tag
+auto_refresh = str(os.environ.get('refresh', '60')) # number of seconds for html refresh meta tag
 #------------------------------------------------------------------
 
 jobs=[]
